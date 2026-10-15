@@ -4,26 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>卫星地图查看</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; }
-#map { width: 100%; height: 100%; }
-/* 图层切换 */
+#map { width: 100%; height: 100%; background: #0a120e; }
 #layerBar {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
   display: flex; gap: 10px; z-index: 999;
 }
 #layerBar button {
-  padding: 9px 20px; font-size: 14px; border-radius: 6px; cursor: pointer;
+  padding: 9px 18px; font-size: 14px; border-radius: 6px; cursor: pointer;
   border: 1px solid rgba(255,255,255,0.4);
   background: rgba(0,0,0,0.55); color: #fff;
   transition: all .2s;
 }
 #layerBar button:hover { background: rgba(0,0,0,0.8); }
-#layerBar button.active {
-  background: #1663ff; border-color: #1663ff; color: #fff;
-}
-/* 顶部信息 */
+#layerBar button.active { background: #1663ff; border-color: #1663ff; color: #fff; }
 #titleBar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 999;
   background: rgba(0,0,0,0.5); color: #fff;
@@ -32,14 +29,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsof
   pointer-events: none;
 }
 #titleBar .hint { font-size: 12px; color: #ccc; }
-.amap-logo, .amap-copyright { display: none !important; }
+.leaflet-container .leaflet-control-attribution { display: none; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="titleBar">
   <span>卫星地图查看</span>
-  <span class="hint">滚轮缩放 · 拖拽平移 · 底部按钮切换图层 · 谷歌卫星需代理网络</span>
+  <span class="hint">滚轮缩放(最高21级) · 拖拽平移 · 谷歌卫星需代理网络</span>
 </div>
 <div id="layerBar">
   <button id="btnSat" class="active" onclick="switchLayer('sat')">卫星图</button>
@@ -48,73 +45,48 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsof
   <button id="btnVec" onclick="switchLayer('vec')">矢量地图</button>
   <button id="btnTerrain" onclick="switchLayer('terrain')">地形地貌</button>
 </div>
-<script src="https://webapi.amap.com/maps?v=2.0&key=ef6ce12cb0f3032c10cd7958baeaf15d&plugin=AMap.TileLayer.Satellite,AMap.TileLayer.RoadNet"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var map = null;
-var satLayer = null;
-var roadLayer = null;
-var terrainLayer = null;
-var hdLayer = null;   // ESRI 高清卫星
-var googleLayer = null;  // Google 卫星 (需代理/VPN)
-var current = 'sat';
+var map = L.map('map', { maxZoom: 22, zoomControl: true }).setView([22.5260, 113.8930], 18);
 
-function initMap() {
-  map = new AMap.Map('map', {
-    center: [113.8930, 22.5260],   // 深圳前海
-    zoom: 17,
-    zooms: [4, 20],
-    mapStyle: 'amap://styles/normal',
-    viewMode: '2D',
-  });
-  // 卫星底图
-  satLayer = new AMap.TileLayer.Satellite();
-  // 道路网
-  roadLayer = new AMap.TileLayer.RoadNet();
-  // ESRI 高清卫星 (全球影像, 城市区支持到19级)
-  hdLayer = new AMap.TileLayer({
-    getTileUrl: function(x, y, z) {
-      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + y + '/' + x;
-    },
-    zIndex: 1,
-  });
-  // Google 卫星 (城市区支持到20级, 需代理)
-  googleLayer = new AMap.TileLayer({
-    getTileUrl: function(x, y, z) {
-      var s = (x + y) % 4;
-      return 'https://mt' + s + '.google.com/vt/lyrs=s&x=' + x + '&y=' + y + '&z=' + z;
-    },
-    zIndex: 1,
-  });
-  // 地形地貌(矢量底图之上的等高线/山影)
-  terrainLayer = new AMap.TileLayer({
-    getTileUrl: function(x, y, z) {
-      return 'https://wprd0' + (x % 4 + 1) + '.is.autonavi.com/appmaptile?style=7&x=' + x + '&y=' + y + '&z=' + z;
-    },
-    zIndex: 3,
-    opacity: 0.55,
-  });
-  satLayer.setMap(map);
-  roadLayer.setMap(map);
-}
+// ── 高德卫星 (18级封顶, 国内最快)
+var gdSat = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', {
+  subdomains: ['1','2','3','4'], maxNativeZoom: 18, maxZoom: 22,
+});
+// ── 高德路网标注 (透明叠加层)
+var gdRoad = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}', {
+  subdomains: ['1','2','3','4'], maxNativeZoom: 18, maxZoom: 22, opacity: 0.85,
+});
+// ── ESRI 高清卫星 (19级)
+var esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxNativeZoom: 19, maxZoom: 22,
+});
+// ── Google 卫星 (21级, 需代理)
+var google = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  subdomains: ['0','1','2','3'], maxNativeZoom: 21, maxZoom: 22,
+});
+// ── 高德矢量
+var gdVec = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+  subdomains: ['1','2','3','4'], maxNativeZoom: 18, maxZoom: 22,
+});
+// ── 高德地形 (等高线/山影)
+var gdTerrain = L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?style=7&x={x}&y={y}&z={z}', {
+  subdomains: ['1','2','3','4'], maxNativeZoom: 16, maxZoom: 22, opacity: 0.9,
+});
+
+var current = 'sat';
+gdSat.addTo(map);
+gdRoad.addTo(map);
 
 function switchLayer(mode) {
   current = mode;
-  if (mode === 'sat') {
-    map.setMapStyle('amap://styles/normal');
-    satLayer.setMap(map); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(null); terrainLayer.setMap(null);
-  } else if (mode === 'hd') {
-    map.setMapStyle('amap://styles/normal');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(map); googleLayer.setMap(null); terrainLayer.setMap(null);
-  } else if (mode === 'google') {
-    map.setMapStyle('amap://styles/normal');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(map); terrainLayer.setMap(null);
-  } else if (mode === 'vec') {
-    map.setMapStyle('amap://styles/whitesmoke');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(null); terrainLayer.setMap(null);
-  } else {
-    map.setMapStyle('amap://styles/whitesmoke');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(null); terrainLayer.setMap(map);
-  }
+  // 全部移除
+  [gdSat, gdRoad, esri, google, gdVec, gdTerrain].forEach(function(l) { map.removeLayer(l); });
+  if (mode === 'sat') { gdSat.addTo(map); gdRoad.addTo(map); }
+  else if (mode === 'hd') { esri.addTo(map); gdRoad.addTo(map); }
+  else if (mode === 'google') { google.addTo(map); gdRoad.addTo(map); }
+  else if (mode === 'vec') { gdVec.addTo(map); }
+  else { gdTerrain.addTo(map); gdRoad.addTo(map); }
   document.getElementById('btnSat').className = mode === 'sat' ? 'active' : '';
   document.getElementById('btnHD').className = mode === 'hd' ? 'active' : '';
   document.getElementById('btnGoogle').className = mode === 'google' ? 'active' : '';
@@ -122,19 +94,9 @@ function switchLayer(mode) {
   document.getElementById('btnTerrain').className = mode === 'terrain' ? 'active' : '';
 }
 
-function startApp() {
-  initMap();
-  // 支持 ?layer=hd|vec|terrain 直达指定图层
-  var m = (location.search || '').match(/layer=(\w+)/);
-  if (m && m[1] !== 'sat') switchLayer(m[1]);
-}
-if (typeof AMap !== 'undefined') { startApp(); }
-else {
-  window.onload = function() {
-    if (typeof AMap !== 'undefined') startApp();
-    else setTimeout(function() { if (typeof AMap !== 'undefined') startApp(); }, 2000);
-  };
-}
+// URL参数直达图层: ?layer=hd|google|vec|terrain
+var m = (location.search || '').match(/layer=(\w+)/);
+if (m && m[1] !== 'sat') switchLayer(m[1]);
 </script>
 </body>
 </html>
