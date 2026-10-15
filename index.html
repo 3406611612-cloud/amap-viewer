@@ -43,6 +43,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsof
 </div>
 <div id="layerBar">
   <button id="btnSat" class="active" onclick="switchLayer('sat')">卫星图</button>
+  <button id="btnHD" onclick="switchLayer('hd')">高清卫星</button>
   <button id="btnVec" onclick="switchLayer('vec')">矢量地图</button>
   <button id="btnTerrain" onclick="switchLayer('terrain')">地形地貌</button>
 </div>
@@ -52,6 +53,7 @@ var map = null;
 var satLayer = null;
 var roadLayer = null;
 var terrainLayer = null;
+var hdLayer = null;   // ESRI 高清卫星
 var current = 'sat';
 
 function initMap() {
@@ -66,6 +68,13 @@ function initMap() {
   satLayer = new AMap.TileLayer.Satellite();
   // 道路网
   roadLayer = new AMap.TileLayer.RoadNet();
+  // ESRI 高清卫星 (全球影像, 城市区支持到19级)
+  hdLayer = new AMap.TileLayer({
+    getTileUrl: function(x, y, z) {
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + y + '/' + x;
+    },
+    zIndex: 1,
+  });
   // 地形地貌(矢量底图之上的等高线/山影)
   terrainLayer = new AMap.TileLayer({
     getTileUrl: function(x, y, z) {
@@ -82,20 +91,29 @@ function switchLayer(mode) {
   current = mode;
   if (mode === 'sat') {
     map.setMapStyle('amap://styles/normal');
-    satLayer.setMap(map); roadLayer.setMap(map); terrainLayer.setMap(null);
+    satLayer.setMap(map); roadLayer.setMap(map); hdLayer.setMap(null); terrainLayer.setMap(null);
+  } else if (mode === 'hd') {
+    map.setMapStyle('amap://styles/normal');
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(map); terrainLayer.setMap(null);
   } else if (mode === 'vec') {
     map.setMapStyle('amap://styles/whitesmoke');
-    satLayer.setMap(null); roadLayer.setMap(map); terrainLayer.setMap(null);
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); terrainLayer.setMap(null);
   } else {
     map.setMapStyle('amap://styles/whitesmoke');
-    satLayer.setMap(null); roadLayer.setMap(map); terrainLayer.setMap(map);
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); terrainLayer.setMap(map);
   }
   document.getElementById('btnSat').className = mode === 'sat' ? 'active' : '';
+  document.getElementById('btnHD').className = mode === 'hd' ? 'active' : '';
   document.getElementById('btnVec').className = mode === 'vec' ? 'active' : '';
   document.getElementById('btnTerrain').className = mode === 'terrain' ? 'active' : '';
 }
 
-function startApp() { initMap(); }
+function startApp() {
+  initMap();
+  // 支持 ?layer=hd|vec|terrain 直达指定图层
+  var m = (location.search || '').match(/layer=(\w+)/);
+  if (m && m[1] !== 'sat') switchLayer(m[1]);
+}
 if (typeof AMap !== 'undefined') { startApp(); }
 else {
   window.onload = function() {
