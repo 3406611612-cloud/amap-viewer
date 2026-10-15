@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卫星地图查看</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; }
+#map { width: 100%; height: 100%; }
+/* 图层切换 */
+#layerBar {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  display: flex; gap: 10px; z-index: 999;
+}
+#layerBar button {
+  padding: 9px 20px; font-size: 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(0,0,0,0.55); color: #fff;
+  transition: all .2s;
+}
+#layerBar button:hover { background: rgba(0,0,0,0.8); }
+#layerBar button.active {
+  background: #1663ff; border-color: #1663ff; color: #fff;
+}
+/* 顶部信息 */
+#titleBar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+  background: rgba(0,0,0,0.5); color: #fff;
+  padding: 10px 16px; font-size: 14px;
+  display: flex; justify-content: space-between; align-items: center;
+  pointer-events: none;
+}
+#titleBar .hint { font-size: 12px; color: #ccc; }
+.amap-logo, .amap-copyright { display: none !important; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="titleBar">
+  <span>卫星地图查看</span>
+  <span class="hint">滚轮缩放 · 拖拽平移 · 点击切换图层</span>
+</div>
+<div id="layerBar">
+  <button id="btnSat" class="active" onclick="switchLayer('sat')">卫星图</button>
+  <button id="btnVec" onclick="switchLayer('vec')">矢量地图</button>
+  <button id="btnTerrain" onclick="switchLayer('terrain')">地形地貌</button>
+</div>
+<script src="https://webapi.amap.com/maps?v=2.0&key=ef6ce12cb0f3032c10cd7958baeaf15d&plugin=AMap.TileLayer.Satellite,AMap.TileLayer.RoadNet"></script>
+<script>
+var map = null;
+var satLayer = null;
+var roadLayer = null;
+var terrainLayer = null;
+var current = 'sat';
+
+function initMap() {
+  map = new AMap.Map('map', {
+    center: [113.8930, 22.5260],   // 深圳前海
+    zoom: 14,
+    mapStyle: 'amap://styles/normal',
+    viewMode: '2D',
+  });
+  // 卫星底图
+  satLayer = new AMap.TileLayer.Satellite();
+  // 道路网
+  roadLayer = new AMap.TileLayer.RoadNet();
+  // 地形地貌(矢量底图之上的等高线/山影)
+  terrainLayer = new AMap.TileLayer({
+    getTileUrl: function(x, y, z) {
+      return 'https://wprd0' + (x % 4 + 1) + '.is.autonavi.com/appmaptile?style=7&x=' + x + '&y=' + y + '&z=' + z;
+    },
+    zIndex: 3,
+    opacity: 0.55,
+  });
+  satLayer.setMap(map);
+  roadLayer.setMap(map);
+}
+
+function switchLayer(mode) {
+  current = mode;
+  if (mode === 'sat') {
+    map.setMapStyle('amap://styles/normal');
+    satLayer.setMap(map); roadLayer.setMap(map); terrainLayer.setMap(null);
+  } else if (mode === 'vec') {
+    map.setMapStyle('amap://styles/whitesmoke');
+    satLayer.setMap(null); roadLayer.setMap(map); terrainLayer.setMap(null);
+  } else {
+    map.setMapStyle('amap://styles/whitesmoke');
+    satLayer.setMap(null); roadLayer.setMap(map); terrainLayer.setMap(map);
+  }
+  document.getElementById('btnSat').className = mode === 'sat' ? 'active' : '';
+  document.getElementById('btnVec').className = mode === 'vec' ? 'active' : '';
+  document.getElementById('btnTerrain').className = mode === 'terrain' ? 'active' : '';
+}
+
+function startApp() { initMap(); }
+if (typeof AMap !== 'undefined') { startApp(); }
+else {
+  window.onload = function() {
+    if (typeof AMap !== 'undefined') startApp();
+    else setTimeout(function() { if (typeof AMap !== 'undefined') startApp(); }, 2000);
+  };
+}
+</script>
+</body>
+</html>
