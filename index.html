@@ -39,11 +39,12 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsof
 <div id="map"></div>
 <div id="titleBar">
   <span>卫星地图查看</span>
-  <span class="hint">滚轮缩放 · 拖拽平移 · 点击切换图层</span>
+  <span class="hint">滚轮缩放 · 拖拽平移 · 底部按钮切换图层 · 谷歌卫星需代理网络</span>
 </div>
 <div id="layerBar">
   <button id="btnSat" class="active" onclick="switchLayer('sat')">卫星图</button>
   <button id="btnHD" onclick="switchLayer('hd')">高清卫星</button>
+  <button id="btnGoogle" onclick="switchLayer('google')">谷歌卫星</button>
   <button id="btnVec" onclick="switchLayer('vec')">矢量地图</button>
   <button id="btnTerrain" onclick="switchLayer('terrain')">地形地貌</button>
 </div>
@@ -54,13 +55,14 @@ var satLayer = null;
 var roadLayer = null;
 var terrainLayer = null;
 var hdLayer = null;   // ESRI 高清卫星
+var googleLayer = null;  // Google 卫星 (需代理/VPN)
 var current = 'sat';
 
 function initMap() {
   map = new AMap.Map('map', {
     center: [113.8930, 22.5260],   // 深圳前海
     zoom: 17,
-    zooms: [4, 19],
+    zooms: [4, 20],
     mapStyle: 'amap://styles/normal',
     viewMode: '2D',
   });
@@ -72,6 +74,14 @@ function initMap() {
   hdLayer = new AMap.TileLayer({
     getTileUrl: function(x, y, z) {
       return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + y + '/' + x;
+    },
+    zIndex: 1,
+  });
+  // Google 卫星 (城市区支持到20级, 需代理)
+  googleLayer = new AMap.TileLayer({
+    getTileUrl: function(x, y, z) {
+      var s = (x + y) % 4;
+      return 'https://mt' + s + '.google.com/vt/lyrs=s&x=' + x + '&y=' + y + '&z=' + z;
     },
     zIndex: 1,
   });
@@ -91,19 +101,23 @@ function switchLayer(mode) {
   current = mode;
   if (mode === 'sat') {
     map.setMapStyle('amap://styles/normal');
-    satLayer.setMap(map); roadLayer.setMap(map); hdLayer.setMap(null); terrainLayer.setMap(null);
+    satLayer.setMap(map); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(null); terrainLayer.setMap(null);
   } else if (mode === 'hd') {
     map.setMapStyle('amap://styles/normal');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(map); terrainLayer.setMap(null);
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(map); googleLayer.setMap(null); terrainLayer.setMap(null);
+  } else if (mode === 'google') {
+    map.setMapStyle('amap://styles/normal');
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(map); terrainLayer.setMap(null);
   } else if (mode === 'vec') {
     map.setMapStyle('amap://styles/whitesmoke');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); terrainLayer.setMap(null);
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(null); terrainLayer.setMap(null);
   } else {
     map.setMapStyle('amap://styles/whitesmoke');
-    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); terrainLayer.setMap(map);
+    satLayer.setMap(null); roadLayer.setMap(map); hdLayer.setMap(null); googleLayer.setMap(null); terrainLayer.setMap(map);
   }
   document.getElementById('btnSat').className = mode === 'sat' ? 'active' : '';
   document.getElementById('btnHD').className = mode === 'hd' ? 'active' : '';
+  document.getElementById('btnGoogle').className = mode === 'google' ? 'active' : '';
   document.getElementById('btnVec').className = mode === 'vec' ? 'active' : '';
   document.getElementById('btnTerrain').className = mode === 'terrain' ? 'active' : '';
 }
